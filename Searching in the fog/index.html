@@ -1,0 +1,618 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DBD — Guess The Killer</title>
+<script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<style>
+:root {
+  --red: #a71919;
+  --dark: #090909;
+  --panel: #171515;
+  --muted: #777;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(ellipse at top, #351010 0%, #100b0b 48%, #050505 100%);
+  color: #eee;
+  font-family: Georgia, serif;
+  min-height: 100vh;
+}
+header {
+  text-align: center;
+  padding: 25px 12px;
+  background: linear-gradient(#180909, #090606);
+  border-bottom: 2px solid #8d1717;
+  box-shadow: 0 5px 30px #000;
+}
+h1 {
+  margin: 0;
+  color: #d42b2b;
+  letter-spacing: 5px;
+  font-size: clamp(25px,5vw,43px);
+  text-shadow: 0 0 20px #a00;
+}
+header p {
+  color: #a99b9b;
+  letter-spacing: 3px;
+  font-size: 12px;
+}
+main {
+  width: min(1250px, 96%);
+  margin: auto;
+  padding: 20px 0 50px;
+}
+.panel {
+  background: #171313e8;
+  border: 1px solid #552020;
+  padding: 18px;
+  margin-bottom: 18px;
+  border-radius: 5px;
+  box-shadow: 0 5px 20px #0008;
+}
+h2 {
+  color: #d7caca;
+  font-size: 18px;
+  letter-spacing: 2px;
+  margin-top: 0;
+}
+button, input, select {
+  font: inherit;
+}
+button {
+  background: #711515;
+  border: 1px solid #b52b2b;
+  color: white;
+  padding: 11px 16px;
+  cursor: pointer;
+  transition: .2s;
+  border-radius: 3px;
+}
+button:hover {
+  background: #b32323;
+  box-shadow: 0 0 12px #a00;
+}
+button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+input {
+  background: #090909;
+  color: white;
+  border: 1px solid #5b2929;
+  padding: 11px;
+  min-width: 0;
+  border-radius: 3px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+#status {
+  color: #d4a2a2;
+  margin-top: 12px;
+  font-size: 14px;
+}
+#roomCode {
+  color: #ff5555;
+  font-size: 24px;
+  letter-spacing: 5px;
+}
+#grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill,minmax(145px,1fr));
+  gap: 13px;
+}
+.card {
+  height: 210px;
+  position: relative;
+  overflow: hidden;
+  background: #211919;
+  border: 1px solid #674040;
+  cursor: pointer;
+  transition: transform .3s, opacity .3s;
+  border-radius: 4px;
+  animation: appear .4s ease both;
+}
+@keyframes appear {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.card:hover {
+  border-color: #e12b2b;
+  transform: translateY(-4px);
+  box-shadow: 0 0 15px #85000088;
+}
+.card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+  filter: brightness(.78);
+}
+.card .fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 60px;
+  color: #8f2929;
+  background:
+    radial-gradient(circle, #542020, #110909 75%);
+}
+.card .name {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  padding: 30px 5px 10px;
+  text-align: center;
+  background: linear-gradient(transparent,#080606 55%);
+  font-size: 14px;
+  z-index: 2;
+}
+.card .number {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  background: #170808cc;
+  padding: 4px 7px;
+  font-size: 11px;
+  z-index: 2;
+}
+.card.eliminated {
+  transform: rotate(2deg) scale(.94);
+  opacity: .18;
+  filter: grayscale(1);
+  border: 2px solid #555;
+}
+.card.eliminated::after {
+  content: "✕";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 65px;
+  color: #e32626;
+  z-index: 5;
+  text-shadow: 0 0 12px black;
+}
+.card.secret {
+  border: 2px solid gold;
+}
+#count {
+  color: #ed4545;
+  font-size: 24px;
+}
+#answerBox {
+  background: #090707;
+  border: 1px solid #5e2525;
+  padding: 15px;
+  margin-top: 12px;
+}
+#incomingQuestion {
+  color: #ff7777;
+  font-size: 18px;
+  margin: 10px 0;
+}
+#log {
+  max-height: 170px;
+  overflow: auto;
+  color: #a99b9b;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.small { color: #999; font-size: 12px; }
+#mySecret {
+  color: #e7c77a;
+}
+@media(max-width:500px) {
+  #grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .card { height: 190px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>GUESS THE KILLER</h1>
+  <p>DEAD BY DAYLIGHT FAN GAME</p>
+</header>
+
+<main>
+
+<section class="panel">
+  <h2>☠ ОНЛАЙН-КОМНАТА</h2>
+  <div class="row">
+    <button onclick="createRoom()">Создать комнату</button>
+    <input id="joinCode" placeholder="Код комнаты" maxlength="6">
+    <button onclick="joinRoom()">Подключиться</button>
+  </div>
+  <div id="status">Ожидание подключения...</div>
+  <div id="roomInfo" hidden>
+    Код комнаты: <strong id="roomCode"></strong>
+    <button onclick="copyCode()">Копировать код</button>
+  </div>
+  <p class="small">
+    Для игры необходимо, чтобы оба игрока были подключены к интернету.
+  </p>
+</section>
+
+<section class="panel">
+  <h2>☠ ТВОЙ СЕКРЕТНЫЙ УБИЙЦА</h2>
+  <p id="mySecret">Сначала подключись к сопернику.</p>
+  <p class="small">
+    Соперник не видит, кого выбрала твоя игра.
+  </p>
+</section>
+
+<section class="panel">
+  <h2>🩸 ВОПРОС СОПЕРНИКУ</h2>
+  <div class="row">
+    <input id="questionInput"
+      placeholder="Например: У него есть маска?"
+      style="flex:1">
+    <button onclick="sendQuestion()">Задать вопрос</button>
+  </div>
+  <div id="answerBox">
+    <div class="small">Вопрос от соперника:</div>
+    <div id="incomingQuestion">Пока вопросов нет.</div>
+    <div class="row">
+      <button onclick="answerQuestion(true)">ДА</button>
+      <button onclick="answerQuestion(false)">НЕТ</button>
+    </div>
+  </div>
+  <p id="lastAnswer"></p>
+</section>
+
+<section class="panel">
+  <h2>☠ ТВОЯ ДОСКА УБИЙЦ</h2>
+  <p>Нажимай на портреты, чтобы исключить персонажей.</p>
+  <p>Осталось: <strong id="count">44</strong></p>
+  <div class="row" style="margin-bottom:15px">
+    <input id="search" placeholder="Поиск убийцы..."
+      oninput="render()" style="flex:1">
+    <button onclick="resetCards()">Сбросить карточки</button>
+  </div>
+  <div id="grid"></div>
+</section>
+
+<section class="panel">
+  <h2>⚔ УГАДАТЬ УБИЙЦУ</h2>
+  <div class="row">
+    <select id="guessSelect" style="flex:1">
+      <option value="">Выбери убийцу...</option>
+    </select>
+    <button onclick="makeGuess()">Сделать предположение</button>
+  </div>
+  <p id="result"></p>
+</section>
+
+<section class="panel">
+  <h2>📜 ИСТОРИЯ</h2>
+  <div id="log">Туман скрывает всё...</div>
+</section>
+
+</main>
+
+<script>
+const killers = [
+ ["Траппер","trapper"],
+ ["Призрак","wraith"],
+ ["Деревенщина","hillbilly"],
+ ["Медсестра","nurse"],
+ ["Тень","shape"],
+ ["Ведьма","hag"],
+ ["Доктор","doctor"],
+ ["Охотница","huntress"],
+ ["Каннибал","cannibal"],
+ ["Кошмар","nightmare"],
+ ["Свинья","pig"],
+ ["Клоун","clown"],
+ ["Дух","spirit"],
+ ["Легион","legion"],
+ ["Чума","plague"],
+ ["Призрачное лицо","ghostface"],
+ ["Демогоргон","demogorgon"],
+ ["Они","oni"],
+ ["Стрелок","deathslinger"],
+ ["Палач","executioner"],
+ ["Мор","blight"],
+ ["Близнецы","twins"],
+ ["Трикстер","trickster"],
+ ["Немезис","nemesis"],
+ ["Cенобит","cenobite"],
+ ["Художница","artist"],
+ ["Онрё","onryo"],
+ ["Мор","dredge"],
+ ["Мастермайнд","mastermind"],
+ ["Рыцарь","knight"],
+ ["Торговка черепами","skullmerchant"],
+ ["Сингулярность","singularity"],
+ ["Ксеноморф","xenomorph"],
+ ["Хороший парень","goodguy"],
+ ["Неведомое","unknown"],
+ ["Лич","lich"],
+ ["Тёмный лорд","darklord"],
+ ["Егерь","houndmaster"],
+ ["Гуль","ghoul"],
+ ["Аниматроник","animatronic"],
+ ["Красу","krasue"],
+ ["Первый","first"],
+ ["Слэшер","slasher"],
+ ["Правосудие","judgment"]
+].map(([name,id]) => ({
+ name,
+ id,
+ portrait:`portraits/${id}.jpg`
+}));
+
+let peer = null;
+let connection = null;
+let secret = null;
+let eliminated = new Set();
+let currentQuestion = null;
+let gameStarted = false;
+
+function log(message) {
+ const box = document.getElementById("log");
+ box.innerHTML = `<div>• ${message}</div>` + box.innerHTML;
+}
+
+function status(message) {
+ document.getElementById("status").textContent = message;
+}
+
+function createRoom() {
+ if (peer) peer.destroy();
+
+ const code = Math.random().toString(36)
+   .substring(2,8).toUpperCase();
+
+ peer = new Peer("dbd-" + code);
+
+ peer.on("open", () => {
+   document.getElementById("roomCode").textContent = code;
+   document.getElementById("roomInfo").hidden = false;
+   status("Комната создана. Ожидаем второго игрока...");
+ });
+
+ peer.on("connection", conn => {
+   if (connection) {
+     conn.close();
+     return;
+   }
+   setupConnection(conn);
+ });
+
+ peer.on("error", e => {
+   status("Ошибка комнаты: " + e.type);
+ });
+}
+
+function joinRoom() {
+ const code = document.getElementById("joinCode")
+   .value.trim().toUpperCase();
+
+ if (code.length !== 6) {
+   alert("Введите шестизначный код комнаты.");
+   return;
+ }
+
+ if (peer) peer.destroy();
+ peer = new Peer();
+
+ peer.on("open", () => {
+   const conn = peer.connect("dbd-" + code);
+   setupConnection(conn);
+ });
+
+ peer.on("error", e => {
+   status("Ошибка подключения: " + e.type);
+ });
+}
+
+function setupConnection(conn) {
+ connection = conn;
+
+ conn.on("open", () => {
+   status("Соперник подключён! Игра началась.");
+   startGame();
+   conn.send({type:"ready"});
+   log("Соединение установлено.");
+ });
+
+ conn.on("data", handleData);
+
+ conn.on("close", () => {
+   status("Соперник отключился.");
+   gameStarted = false;
+ });
+
+ conn.on("error", () => {
+   status("Ошибка соединения.");
+ });
+}
+
+function send(data) {
+ if (!connection || !connection.open) {
+   alert("Сначала подключись к сопернику.");
+   return;
+ }
+ connection.send(data);
+}
+
+function startGame() {
+ secret = killers[Math.floor(Math.random()*killers.length)];
+ eliminated.clear();
+ gameStarted = true;
+
+ document.getElementById("mySecret").textContent =
+   "☠ " + secret.name;
+
+ document.getElementById("result").textContent = "";
+ render();
+ log("Новый раунд начался.");
+}
+
+function handleData(data) {
+ if (data.type === "ready") {
+   if (!gameStarted) startGame();
+   status("Соперник готов. Игра началась!");
+ }
+
+ if (data.type === "question") {
+   currentQuestion = data.text;
+   document.getElementById("incomingQuestion").textContent =
+     currentQuestion;
+   log("Соперник спросил: " + data.text);
+ }
+
+ if (data.type === "answer") {
+   document.getElementById("lastAnswer").textContent =
+     "Ответ соперника: " + (data.value ? "ДА" : "НЕТ");
+   log("Соперник ответил: " +
+     (data.value ? "ДА" : "НЕТ"));
+ }
+
+ if (data.type === "guess") {
+   const correct = data.id === secret.id;
+   send({
+     type:"guessResult",
+     correct,
+     name:secret.name
+   });
+   if (correct) {
+     log("Соперник угадал твоего убийцу!");
+   } else {
+     log("Соперник ошибся с догадкой.");
+   }
+ }
+
+ if (data.type === "guessResult") {
+   document.getElementById("result").textContent =
+     data.correct
+       ? "☠ ПОБЕДА! Ты угадал убийцу!"
+       : "✖ Неверно! Загаданный убийца: " + data.name;
+
+   log(data.correct
+     ? "Ты победил!"
+     : "Твоя догадка оказалась неверной.");
+ }
+}
+
+function sendQuestion() {
+ const text = document.getElementById("questionInput")
+   .value.trim();
+
+ if (!text) return;
+
+ send({type:"question",text});
+ log("Ты спросил: " + text);
+ document.getElementById("questionInput").value = "";
+}
+
+function answerQuestion(value) {
+ if (!currentQuestion) {
+   alert("Сначала дождись вопроса.");
+   return;
+ }
+
+ send({type:"answer",value});
+ log("Ты ответил: " + (value ? "ДА" : "НЕТ"));
+ currentQuestion = null;
+ document.getElementById("incomingQuestion").textContent =
+   "Ответ отправлен.";
+}
+
+function makeGuess() {
+ const id = document.getElementById("guessSelect").value;
+ if (!id) {
+   alert("Выбери убийцу.");
+   return;
+ }
+
+ send({type:"guess",id});
+ log("Ты сделал предположение.");
+}
+
+function render() {
+ const grid = document.getElementById("grid");
+ const search = document.getElementById("search")
+   .value.toLowerCase();
+
+ grid.innerHTML = "";
+
+ killers.forEach((killer,i) => {
+   if (!killer.name.toLowerCase().includes(search)) return;
+
+   const card = document.createElement("div");
+   card.className = "card" +
+     (eliminated.has(killer.id) ? " eliminated" : "");
+
+   const fallback = document.createElement("div");
+   fallback.className = "fallback";
+   fallback.textContent = "☠";
+   card.appendChild(fallback);
+
+   const img = document.createElement("img");
+   img.src = killer.portrait;
+   img.alt = killer.name;
+   img.onerror = () => img.remove();
+   card.appendChild(img);
+
+   const number = document.createElement("div");
+   number.className = "number";
+   number.textContent = "#" + (i+1);
+   card.appendChild(number);
+
+   const name = document.createElement("div");
+   name.className = "name";
+   name.textContent = killer.name;
+   card.appendChild(name);
+
+   card.onclick = () => {
+     if (eliminated.has(killer.id)) {
+       eliminated.delete(killer.id);
+     } else {
+       eliminated.add(killer.id);
+     }
+     render();
+   };
+
+   grid.appendChild(card);
+ });
+
+ document.getElementById("count").textContent =
+   killers.length - eliminated.size;
+}
+
+function resetCards() {
+ eliminated.clear();
+ render();
+}
+
+function copyCode() {
+ const code = document.getElementById("roomCode").textContent;
+ navigator.clipboard.writeText(code);
+ alert("Код скопирован!");
+}
+
+const select = document.getElementById("guessSelect");
+killers.forEach(k => {
+ const option = document.createElement("option");
+ option.value = k.id;
+ option.textContent = k.name;
+ select.appendChild(option);
+});
+
+render();
+</script>
+</body>
+</html>
